@@ -1,0 +1,342 @@
+package com.terrorAndBlue.thaumicUtils.command;
+
+import java.awt.Color;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.swing.JFrame;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+import javax.swing.plaf.ScrollBarUI;
+import javax.swing.text.BadLocationException;
+
+import com.terrorAndBlue.thaumicUtils.ThaumicUtils;
+import com.terrorAndBlue.thaumicUtils.entity.EntityReflectShieldVisual;
+import com.terrorAndBlue.thaumicUtils.handlers.HandlerUtils;
+import com.terrorAndBlue.thaumicUtils.items.ItemFocusReflectShield;
+import com.terrorAndBlue.thaumicUtils.items.TerrorBaseFocus;
+import com.terrorAndBlue.thaumicUtils.network.CreateReflectShieldVisualPacket;
+import com.terrorAndBlue.thaumicUtils.util.DropList;
+
+import cpw.mods.fml.common.registry.GameRegistry;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ChatComponentText;
+import net.minecraft.world.World;
+import thaumcraft.api.ItemApi;
+import thaumcraft.api.wands.FocusUpgradeType;
+
+public class ExtraFociDebugCommand extends CommandBase
+{
+	public static final PrintStream DEFAULT_OUT = System.out;
+	
+	private static final String[] subcommands = new String[] {
+			"debug", "droptable", "reflect", "steal"
+	};
+	
+	public static JFrame outFrame;
+	
+	@Override
+	public String getCommandName()
+	{
+		return "extrafoci";
+	}
+
+	@Override
+	public String getCommandUsage(ICommandSender sender)
+	{
+		return "/extrafoci [command] [args...]. Type /extrafoci help or /extrafoci ? for a list of sub-commands.";
+	}
+	
+	@Override
+	public List addTabCompletionOptions(ICommandSender sender, String[] arr)
+	{
+		List list = super.addTabCompletionOptions(sender, arr);
+		
+		if(arr == null)
+			arr = new String[]{};
+		if(list == null)
+			list = new ArrayList();
+		
+		switch(arr.length)
+		{
+		case 0:
+			for(int i = 0; i < subcommands.length; i++)
+				list.add(subcommands[i]);
+			break;
+		case 1:
+			for(int i = 0; i < subcommands.length; i++)
+				if(subcommands[i].startsWith(arr[0]))
+					list.add(subcommands[i]);
+			break;
+		}
+		
+		return list;
+	}
+
+	@Override
+	public void processCommand(ICommandSender sender, String[] arr)
+	{
+		//Possible TODO: handle incorrect usage cases and send a message.
+		
+		TerrorBaseFocus focus = null;
+		
+		if(arr[0].equalsIgnoreCase("droptable"))
+		{
+			if(arr.length == 1)
+			{
+				String[] cfg = ThaumicUtils.loadCfgFile();
+				sender.addChatMessage(new ChatComponentText("Loaded drops for "+cfg.length+" entities."));
+			}
+			else if(arr.length > 1)
+			{
+				DropList drops = ThaumicUtils.DROP_TABLE.get(arr[1]);
+				
+				if(drops != null)
+				{
+					sender.addChatMessage(new ChatComponentText("Steal focus may give any of the following for "+arr[1]+":"));
+					
+					String[] dropInfo = drops.toNiceStrings();
+					
+					for(int i = 0; i < dropInfo.length; i++)
+						sender.addChatMessage(new ChatComponentText(" " + dropInfo[i]));
+				}
+			}
+			return;
+		}
+		
+		if(sender instanceof EntityPlayer)
+		{
+			EntityPlayer p = (EntityPlayer)sender;
+			
+			boolean checkPriveleges = true;//TODO check if user is operator?
+			
+			/*if(arr[0].equalsIgnoreCase("gfx"))
+			{
+				World w = sender.getEntityWorld();
+				
+				if(w != null && !w.isRemote)
+				{
+					ExtraFoci.wrapper.sendToAll(new CreateReflectShieldVisualPacket(p.getEntityId(), false));
+				}
+			}
+			else */
+			/*if(arr[0].equalsIgnoreCase("stun"))
+			{
+				if(arr.length == 2)
+				{
+					EntityPlayer pl = sender.getEntityWorld().getPlayerEntityByName(arr[1]);
+					
+					if(pl != null)
+					{
+						HandlerUtils.stunnedList.put(pl, System.currentTimeMillis() + 3000);
+					}
+				}
+				else if(arr.length == 1)
+				{
+					HandlerUtils.stunnedList.put(p, System.currentTimeMillis() + 3000);
+				}
+			}
+			else */
+			if(arr[0].equalsIgnoreCase("debug"))
+			{
+				if(outFrame != null)
+				{
+					System.setOut(DEFAULT_OUT);
+					outFrame.dispose();
+					outFrame = null;
+				}
+				
+				try
+				{
+					UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+				}
+				catch (ClassNotFoundException e1) {} 
+				catch (InstantiationException e1) {} 
+				catch (IllegalAccessException e1) {} 
+				catch (UnsupportedLookAndFeelException e1){}
+				
+				outFrame = new JFrame();
+				outFrame.setTitle("Debug Console");
+				
+				final JTextArea textArea = new JTextArea();
+				textArea.setLineWrap(true);
+				textArea.setEditable(false);
+				
+				final JScrollPane scrollPane = new JScrollPane(textArea);
+				scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+				scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+				final JScrollBar bar = scrollPane.createVerticalScrollBar();
+				
+				textArea.setForeground(Color.white);
+				textArea.setBackground(Color.black);
+				
+				scrollPane.setVerticalScrollBar(bar);
+				
+				outFrame.setContentPane(scrollPane);
+				outFrame.setSize(640, 400);
+				
+				outFrame.setAlwaysOnTop(true);
+				outFrame.setResizable(false);
+				outFrame.setVisible(true);
+				
+				outFrame.addWindowListener(new WindowListener()
+				{
+					@Override
+					public void windowOpened(WindowEvent e) {}
+
+					@Override
+					public void windowClosing(WindowEvent e)
+					{
+						outFrame = null;
+						System.setOut(DEFAULT_OUT);
+					}
+
+					@Override
+					public void windowClosed(WindowEvent e) {}
+
+					@Override
+					public void windowIconified(WindowEvent e) {}
+
+					@Override
+					public void windowDeiconified(WindowEvent e) {}
+
+					@Override
+					public void windowActivated(WindowEvent e) {}
+
+					@Override
+					public void windowDeactivated(WindowEvent e) {}
+				});
+				textArea.addKeyListener(new KeyListener()
+				{
+					@Override
+					public void keyTyped(KeyEvent e) {}
+					
+					@Override
+					public void keyPressed(KeyEvent e)
+					{
+						if(e.getKeyCode() == KeyEvent.VK_E)
+						{
+							textArea.setText("");
+						}
+					}
+					
+					@Override
+					public void keyReleased(KeyEvent e) {}
+				});
+				
+				try
+				{
+					File file = File.createTempFile("extrafoci", null);
+					file.deleteOnExit();
+					
+					PrintStream out = new PrintStream(new FileOutputStream(file))
+					{
+						public void print(String s)
+						{
+							//super.print(s);
+							
+							textArea.append(s+"\n");
+							bar.setValue(bar.getMaximum());
+						}
+					};
+					System.setOut(out);
+				}
+				catch(IOException ioe) {}
+				catch(SecurityException se) {}
+			}
+			else
+			if(arr[0].equalsIgnoreCase("reflect"))//start of give focus command
+			{
+				focus = (TerrorBaseFocus) ThaumicUtils.wandFocusReflect;
+				
+				ItemStack stack = new ItemStack(focus);
+				
+				if(arr.length <= 1)
+					p.inventory.addItemStackToInventory(stack);
+				else if(arr[1].length() == 5)
+				{
+					for(int i = 0; i < arr[1].length(); i++)
+					{
+						try
+						{
+							int upgrade = Integer.parseInt(arr[1].substring(i, i+1));
+							
+							if(upgrade == 0)
+								continue;
+							
+							FocusUpgradeType type = focus.getPossibleUpgradesByRank(stack, i+1)[upgrade-1];
+							
+							focus.applyUpgrade(stack, type, i+1);
+						}
+						catch(Exception ex)
+						{
+							p.addChatMessage(new ChatComponentText("Error giving focus item. Please check syntax."));
+							return;
+						}
+					}
+					
+					p.inventory.addItemStackToInventory(stack);
+				}
+			}
+			else if(arr[0].equalsIgnoreCase("steal"))
+			{
+				focus = (TerrorBaseFocus) ThaumicUtils.wandFocusSteal;
+				
+				ItemStack stack = new ItemStack(focus);
+				
+				if(arr.length <= 1)
+					p.inventory.addItemStackToInventory(stack);
+				else if(arr[1].length() == 5)
+				{
+					for(int i = 0; i < arr[1].length(); i++)
+					{
+						try
+						{
+							int upgrade = Integer.parseInt(arr[1].substring(i, i+1));
+							
+							if(upgrade == 0)
+								continue;
+							
+							FocusUpgradeType type = focus.getPossibleUpgradesByRank(stack, i+1)[upgrade-1];
+							
+							focus.applyUpgrade(stack, type, i+1);
+						}
+						catch(Exception ex)
+						{
+							p.addChatMessage(new ChatComponentText("Error giving focus item. Please check syntax."));
+							return;
+						}
+					}
+					
+					p.inventory.addItemStackToInventory(stack);
+				}
+			}
+			else if(arr[0].equalsIgnoreCase("?") || arr[0].equalsIgnoreCase("help"))
+			{
+				p.addChatMessage(new ChatComponentText("ExtraFoci sub-commands: "));
+				p.addChatMessage(new ChatComponentText("   /extrafoci [focus name] [#####] "));
+				p.addChatMessage(new ChatComponentText("       Gives the player the focus item specified with the desired upgrades. # is the upgrade number (1-6) for that rank."));
+			}
+			else
+			{
+				p.addChatMessage(new ChatComponentText("'"+arr[0]+"' is not a recognized sub-command."));
+			}
+		}
+	}
+}

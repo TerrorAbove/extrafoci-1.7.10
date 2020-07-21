@@ -1,0 +1,25 @@
+item.wandFocusReflect.name=Wand Focus: Reflect
+item.wandFocusSteal.name=Wand Focus: Steal
+
+focus.upgrade.revitalizingcounter.name=Revitalizing Counter
+focus.upgrade.recklesscounter.name=Reckless Counter
+focus.upgrade.masteroftheart.name=Master of the Art
+focus.upgrade.superchargedglyphs.name=Supercharged Glyphs
+focus.upgrade.astralaffinity.name=Astral Affinity
+
+focus.upgrade.revitalizingcounter.text=Heal for half of the reflection damage dealt. If the target dies, heal 100% instead.
+focus.upgrade.recklesscounter.text=Counter the enemy with violent rage, dealing 6x damage to them while also sustaining some damage yourself. Potency further increases damage dealt and received.
+focus.upgrade.masteroftheart.text=You are now a Master of the Art, meaning vis will only be spent when you block a hit instead of over time. Also doubles the base reflection damage multiplier.
+focus.upgrade.superchargedglyphs.text=When hit, your shield now knocks back enemies close to you and stuns those further away. Your shield will now persist for up to 10 seconds after you stop using it, provided that you have enough vis. Shift-Right-Click to end early.
+focus.upgrade.astralaffinity.text=While in direct moonlight, damage you reflect hits nearby targets, base vis cost is reduced by 50%, and reflection damage applies a stacking debuff to enemies which increases the damage they take from combat sources for a short time.
+
+tc.research_category.THAUMIC_UTILS=Thaumic Utilities & Extra Foci
+tc.research_name.extra_foci_info=More Foci!
+tc.research_name.extra_foci_reflect=Wand Focus: Reflect
+tc.research_name.extra_foci_crysEss_combining=Crystallized Essence Combining
+
+tc.research_text.extra_foci_info=Just the beginning
+tc.research_text.extra_foci_reflect=Like water off a duck's back...
+tc.research_text.extra_foci_crysEss_combining=Finally, a use for these wretched things!
+
+death.attack.reflection=%1$s succumbed to %2$s's counter-attack

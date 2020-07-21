@@ -1,0 +1,9 @@
+1568569166637	Rename local variable 'paramItemStack'
+1568569172062	Rename local variable 'paramWorld'
+1568569178605	Rename local variable 'paramEntityPlayer'
+1568569190669	Rename local variable 'paramMovingObjectPosition'
+1568601013881	Delete element
+1568698606020	Rename field 'EVERLASTING_BULWARK'
+1568698696356	Rename field 'endlessBulwarkUsers'
+1568736864558	Rename local variable 'rank3Index'
+1568941955318	Rename type 'LivingHurtHandler'

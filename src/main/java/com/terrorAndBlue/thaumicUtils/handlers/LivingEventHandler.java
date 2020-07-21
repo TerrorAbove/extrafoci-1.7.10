@@ -1,0 +1,222 @@
+package com.terrorAndBlue.thaumicUtils.handlers;
+
+import com.terrorAndBlue.thaumicUtils.ThaumicUtils;
+import com.terrorAndBlue.thaumicUtils.handlers.HandlerUtils.AstralDebuff;
+import com.terrorAndBlue.thaumicUtils.items.ItemFocusReflectShield;
+import com.terrorAndBlue.thaumicUtils.network.CreateReflectShieldVisualPacket;
+import com.terrorAndBlue.thaumicUtils.network.StealPacket;
+
+import cpw.mods.fml.common.eventhandler.EventPriority;
+import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import cpw.mods.fml.common.registry.GameRegistry;
+import net.minecraft.entity.EntityLiving;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.monster.EntityCreeper;
+import net.minecraft.entity.monster.EntityEnderman;
+import net.minecraft.entity.monster.EntityMob;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.nbt.NBTTagString;
+import net.minecraft.util.DamageSource;
+import net.minecraftforge.common.util.Constants.NBT;
+import net.minecraftforge.event.entity.living.EnderTeleportEvent;
+import net.minecraftforge.event.entity.living.LivingDropsEvent;
+import net.minecraftforge.event.entity.living.LivingEvent.LivingUpdateEvent;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.event.entity.living.LivingSetAttackTargetEvent;
+import thaumcraft.api.ItemApi;
+import thaumcraft.api.ThaumcraftApi;
+import thaumcraft.api.ThaumcraftApiHelper;
+import thaumcraft.api.aspects.Aspect;
+import thaumcraft.api.aspects.AspectList;
+import thaumcraft.api.aspects.IEssentiaContainerItem;
+import thaumcraft.api.wands.ItemFocusBasic;
+import thaumcraft.common.items.ItemCrystalEssence;
+import thaumcraft.common.items.wands.ItemWandCasting;
+
+public class LivingEventHandler
+{
+	@SubscribeEvent(priority=EventPriority.HIGHEST)
+	public void handleHurt(LivingHurtEvent event)
+	{
+		if(event.entityLiving instanceof EntityPlayer)
+		{
+			EntityPlayer player = (EntityPlayer)event.entityLiving;
+			
+			if(player.getHeldItem() != null && player.isUsingItem() && player.getHeldItem().getItem() instanceof ItemWandCasting)
+			{
+				ItemWandCasting caster = (ItemWandCasting)player.getHeldItem().getItem();
+				
+				if(caster.getFocus(player.getHeldItem()) == ThaumicUtils.wandFocusReflect)
+				{
+					HandlerUtils.doReflectionEffect(event, player, player.getHeldItem(), caster);
+				}
+			}
+			else
+			{
+				ItemStack wand = HandlerUtils.findGlyphWand(player);//finds an active supercharged glyph wand
+				
+				if(wand != null)
+				{
+					HandlerUtils.doReflectionEffect(event, player, wand, (ItemWandCasting)wand.getItem());
+				}
+			}
+		}
+		
+		if(event.source == DamageSource.anvil ||
+				event.source == DamageSource.cactus ||
+				event.source == DamageSource.drown ||
+				event.source == DamageSource.fall ||
+				event.source == DamageSource.fallingBlock ||
+				event.source == DamageSource.inFire ||
+				event.source == DamageSource.inWall ||
+				event.source == DamageSource.lava ||
+				event.source == DamageSource.onFire ||
+				event.source == DamageSource.outOfWorld ||
+				event.source == DamageSource.starve ||
+				event.source == DamageSource.wither)
+			return;
+		
+		if(event.entity == null)
+			return;
+		
+		if(HandlerUtils.debuffList.containsKey(event.entity))
+		{
+			AstralDebuff debuff = HandlerUtils.debuffList.get(event.entity);
+			
+			if(debuff.getExpiration() < System.currentTimeMillis())
+			{
+				HandlerUtils.debuffList.remove(event.entity);
+			}
+			else
+			{
+				event.ammount *= debuff.getMultiplier();
+			}
+		}
+	}
+	
+	@SubscribeEvent(priority=EventPriority.HIGH)
+	public void handleLivingUpdate(LivingUpdateEvent event)
+	{
+		if(event.entityLiving instanceof EntityPlayer)
+		{
+			EntityPlayer player = (EntityPlayer)event.entityLiving;
+			if(HandlerUtils.needWandChecked.contains(player))
+			{
+				ItemStack wand = HandlerUtils.findGlyphWand(player);
+				
+				if(wand != null)
+				{
+					ItemWandCasting caster = (ItemWandCasting)wand.getItem();
+					boolean drainSuccessful = caster.consumeAllVis(wand, player, ItemFocusReflectShield.VIS_USAGE, true, false);
+					boolean client = player.worldObj.isRemote;
+					
+					if(!drainSuccessful)
+					{
+						ItemStack focus = caster.getFocusItem(wand);
+						
+						if(focus.getTagCompound() != null)
+						{
+							focus.getTagCompound().setLong("activeUntil", 0);
+							HandlerUtils.needWandChecked.remove(player);
+						}
+					}
+					
+					if(!client)
+					{
+						ThaumicUtils.wrapper.sendToAll(new CreateReflectShieldVisualPacket(player, !drainSuccessful, false));
+					}
+				}
+			}
+		}
+		
+		if(event.entityLiving != null)
+		{
+			if(HandlerUtils.stunnedList.containsKey(event.entityLiving))
+			{
+				long time = HandlerUtils.stunnedList.get(event.entityLiving);
+				
+				if(time >= System.currentTimeMillis())
+				{
+					event.entityLiving.moveForward = 0;
+					event.entityLiving.moveStrafing = 0;
+					event.entityLiving.posX = event.entityLiving.lastTickPosX;
+					event.entityLiving.posZ = event.entityLiving.lastTickPosZ;
+					
+					if(event.entityLiving instanceof EntityPlayer)
+					{
+						EntityPlayer player = (EntityPlayer)event.entityLiving;
+						player.rotationPitch = -90F;
+						player.rotationYaw = ((player.rotationYaw + 180F + 10F) % 360F) - 180F;
+						player.rotationYawHead = ((player.rotationYawHead + 180F + 10F) % 360F) - 180F;
+					}
+					else if(event.entityLiving instanceof EntityLiving)
+					{
+						EntityLiving elb = (EntityLiving)event.entityLiving;
+						elb.setAttackTarget(null);
+						elb.motionX = 0;
+						elb.motionZ = 0;
+					}
+				}
+			}
+			
+			if(event.entityLiving.getHealth() <= 0 || event.entityLiving.isDead)
+				HandlerUtils.debuffList.remove(event.entityLiving);
+			
+			if(event.entityLiving instanceof EntityCreeper)
+			{
+				EntityCreeper creeper = (EntityCreeper)event.entityLiving;
+				
+				if(creeper.getAttackTarget() instanceof EntityPlayer)
+				{
+					EntityPlayer pl = (EntityPlayer)creeper.getAttackTarget();
+					
+					if(pl.getHeldItem() != null && pl.getHeldItem().getItem() instanceof ItemWandCasting && pl.isUsingItem())
+					{
+						ItemWandCasting caster = (ItemWandCasting)pl.getHeldItem().getItem();
+						ItemFocusBasic focus = caster.getFocus(pl.getHeldItem());
+						
+						if(focus == ThaumicUtils.wandFocusReflect)
+						{
+							if(creeper.getCreeperState() == 1 && creeper.ticksExisted%10 == 0)
+							{
+								LivingHurtEvent fakeEvent = new LivingHurtEvent(pl, DamageSource.causeMobDamage(creeper), creeper.getMaxHealth()/2);
+								HandlerUtils.doReflectionEffect(fakeEvent, pl, pl.getHeldItem(), caster);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	//start of steal focus stuff
+	
+	@SubscribeEvent
+	public void handleDrops(LivingDropsEvent event)
+	{
+		NBTTagCompound tc = event.entityLiving.getEntityData();
+
+		if(tc != null && tc.getInteger("stealTargetNum") > 0)
+		{
+			event.setCanceled(true);
+		}
+	}
+	
+	@SubscribeEvent
+	public void handleEnderman(EnderTeleportEvent event)
+	{
+		if(event.entityLiving instanceof EntityEnderman)
+		{
+			NBTTagCompound tc = event.entityLiving.getEntityData();
+
+			if(tc != null && System.currentTimeMillis() - tc.getLong("stealTargetTeleBlocked") < 1000)
+			{
+				event.setCanceled(true);
+			}
+		}
+	}
+}
